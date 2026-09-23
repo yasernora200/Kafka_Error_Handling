@@ -227,8 +227,3 @@ The repository contains two Spring Boot services:
 On startup, the main topic is created with three partitions, and the retry and DLT topics are created automatically. You can confirm this in the application logs and in Offset Explorer.
 ---
 
-<div align="center">
-
-**Based on the Java Techie tutorial on Kafka error handling with retry and DLT.**
-
-</div>
