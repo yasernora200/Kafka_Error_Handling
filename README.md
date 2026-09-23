@@ -20,10 +20,6 @@
 6. [Topics Created Automatically](#6-topics-created-automatically)
 7. [Project Structure](#7-project-structure)
 8. [Getting Started](#8-getting-started)
-9. [Test Scenarios](#9-test-scenarios)
-10. [Advanced Configuration](#10-advanced-configuration)
-11. [Bulk Processing Demo](#11-bulk-processing-demo)
-12. [Key Takeaways](#12-key-takeaways)
 
 ---
 
@@ -229,92 +225,6 @@ The repository contains two Spring Boot services:
 5. Start the **Publisher** service
 
 On startup, the main topic is created with three partitions, and the retry and DLT topics are created automatically. You can confirm this in the application logs and in Offset Explorer.
-
----
-
-## 9. Test Scenarios
-
-| # | Scenario | Input | Expected Result |
-|---|---|---|---|
-| 1 | Happy path | User with a valid IP | Event is published and consumed successfully. No retries, nothing in the DLT. |
-| 2 | Failure without handling | User with a restricted IP (before adding retry and DLT) | Consumer throws an exception and the event is lost. |
-| 3 | Failure with retry and DLT | User with a restricted IP (after adding retry and DLT) | Event fails, goes through `retry-0`, `retry-1`, `retry-2`, then lands in the DLT. |
-| 4 | Mixed valid and invalid events | Several valid users followed by one invalid user | Only the invalid event appears in the DLT. Valid ones are processed normally. |
-
-**How to verify scenario 3**
-
-- **Application logs:** each attempt logs the topic name, so you can see the event arriving from the main topic and then from each retry topic in order.
-- **Offset Explorer:** open each retry topic and the DLT to see the same event stored in every stage.
-
----
-
-## 10. Advanced Configuration
-
-### Backoff between retries
-
-By default, retries happen back to back. A backoff policy adds a delay between attempts and can grow exponentially.
-
-| Setting | Example | Meaning |
-|---|---|---|
-| Delay | 3000 ms | Wait 3 seconds before the first retry |
-| Multiplier | 1.5 | Each delay is 1.5 times the previous one |
-| Max delay | 15000 ms | The delay never exceeds 15 seconds |
-
-### Excluding exceptions from retry
-
-Some errors are not worth retrying, for example a null pointer caused by malformed data. Such exceptions can be excluded so the event goes **straight to the DLT** without wasting attempts.
-
-> In this demo the simulated failure is a runtime exception, so it must **not** be excluded if you want to observe the retry behavior.
-
-### Number of attempts
-
-| Attempts configured | Original attempt | Retries | Retry topics created |
-|---|---|---|---|
-| 3 (default) | 1 | 2 | 2 |
-| 4 | 1 | 3 | 3 |
-| 5 | 1 | 4 | 4 |
-
----
-
-## 11. Bulk Processing Demo
-
-To validate the behavior at scale, the publisher loads a **CSV file with 100 users**, converts it to a list of user objects, and publishes them one by one.
-
-```mermaid
-flowchart LR
-    CSV[/CSV file<br/>100 users/] --> PUB[Publisher]
-    PUB --> TOP[(Main Topic)]
-    TOP --> CON{{Consumer}}
-    CON -->|96 valid| OK[Processed]
-    CON -->|4 restricted IPs| RET[Retry topics]
-    RET --> DLT[(DLT<br/>4 events)]
-
-    classDef good fill:#d4edda,stroke:#28a745,color:#333;
-    classDef bad fill:#f8d7da,stroke:#c82333,color:#333;
-    class OK good;
-    class DLT bad;
-```
-
-| Metric | Value |
-|---|---|
-| Total events published | 100 |
-| Restricted IPs configured in the consumer | 4 (taken from the same CSV) |
-| Events processed normally | 96 |
-| Events sent to the DLT | 4 |
-
-**Verification:** the consumer logs show four DLT messages, and the DLT topic in Offset Explorer contains four new records, matching the restricted IPs.
-
----
-
-## 12. Key Takeaways
-
-- Never let a failed event silently disappear. Retry it first.
-- Retries run through dedicated topics, so a failing event does not block the rest of the stream.
-- Events that still fail after all retries are preserved in the Dead Letter Topic.
-- Kafka creates the retry and DLT topics automatically.
-- Backoff and exception exclusion let you tune the behavior to your use case.
-- The DLT gives you a safe place to monitor, investigate, and reprocess failures.
-
 ---
 
 <div align="center">
